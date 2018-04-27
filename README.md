@@ -21,20 +21,101 @@ Both Generator and Discriminator are stacked fully-connected layers in case of *
 
 ### Vanilla GAN
 
-This loss function is from the original paper by [Goodfellow et al.](https://arxiv.org/abs/1406.2661). It can be thought as minimax game between generator and discriminator where generator ($G$) trying to fool the discriminator ($D$), and the discriminator trying to correctly classify real vs. fake.
+This loss function is from the original paper by [Goodfellow et al.](https://arxiv.org/abs/1406.2661). It can be thought as minimax game between generator and discriminator where generator (<a href="https://www.codecogs.com/eqnedit.php?latex=$G$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$G$" title="$G$" /></a>) trying to fool the discriminator (<a href="https://www.codecogs.com/eqnedit.php?latex=$D$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$D$" title="$D$" /></a>), and the discriminator trying to correctly classify real vs. fake.
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=$$\underset{G}{\text{minimize}}\;&space;\underset{D}{\text{maximize}}\;&space;\mathbb{E}_{x&space;\sim&space;p_\text{data}}\left[\log&space;D(x)\right]&space;&plus;&space;\mathbb{E}_{z&space;\sim&space;p(z)}\left[\log&space;\left(1-D(G(z))\right)\right]$$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$$\underset{G}{\text{minimize}}\;&space;\underset{D}{\text{maximize}}\;&space;\mathbb{E}_{x&space;\sim&space;p_\text{data}}\left[\log&space;D(x)\right]&space;&plus;&space;\mathbb{E}_{z&space;\sim&space;p(z)}\left[\log&space;\left(1-D(G(z))\right)\right]$$" title="$$\underset{G}{\text{minimize}}\; \underset{D}{\text{maximize}}\; \mathbb{E}_{x \sim p_\text{data}}\left[\log D(x)\right] + \mathbb{E}_{z \sim p(z)}\left[\log \left(1-D(G(z))\right)\right]$$" /></a>
 
-where <a href="https://www.codecogs.com/eqnedit.php?latex=$x&space;\sim&space;p_\text{data}$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$x&space;\sim&space;p_\text{data}$" title="$x \sim p_\text{data}$" /></a> are samples from the input data, $z \sim p(z)$ are the random noise samples, $G(z)$ are the generated images using the neural network generator $G$, and $D$ is the output of the discriminator, specifying the probability of an input being real. In [Goodfellow et al.](https://arxiv.org/abs/1406.2661), they analyze this minimax game and show how it relates to minimizing the Jensen-Shannon divergence between the training data distribution and the generated samples from $G$.
+where <a href="https://www.codecogs.com/eqnedit.php?latex=$x&space;\sim&space;p_\text{data}$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$x&space;\sim&space;p_\text{data}$" title="$x \sim p_\text{data}$" /></a> are samples from the input data, <a href="https://www.codecogs.com/eqnedit.php?latex=$z&space;\sim&space;p(z)$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$z&space;\sim&space;p(z)$" title="$z \sim p(z)$" /></a> are the random noise samples, <a href="https://www.codecogs.com/eqnedit.php?latex=$G(z)$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$G(z)$" title="$G(z)$" /></a> are the generated images using the neural network generator <a href="https://www.codecogs.com/eqnedit.php?latex=$G$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$G$" title="$G$" /></a>, and <a href="https://www.codecogs.com/eqnedit.php?latex=$D$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$D$" title="$D$" /></a> is the output of the discriminator, specifying the probability of an input being real. In [Goodfellow et al.](https://arxiv.org/abs/1406.2661), they analyze this minimax game and show how it relates to minimizing the Jensen-Shannon divergence between the training data distribution and the generated samples from $G$.
+
+To optimize this minimax game, we will aternate between taking gradient *descent* steps on the objective for <a href="https://www.codecogs.com/eqnedit.php?latex=$G$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$G$" title="$G$" /></a>, and gradient *ascent* steps on the objective for <a href="https://www.codecogs.com/eqnedit.php?latex=$D$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$D$" title="$D$" /></a>:
+1. update the **generator** (<a href="https://www.codecogs.com/eqnedit.php?latex=$G$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$G$" title="$G$" /></a>) to minimize the probability of the __discriminator making the correct choice__. 
+2. update the **discriminator** (<a href="https://www.codecogs.com/eqnedit.php?latex=$D$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$D$" title="$D$" /></a>) to maximize the probability of the __discriminator making the correct choice__.
+
+While these updates are useful for analysis, they do not perform well in practice. Instead, we will use a different objective when we update the generator: maximize the probability of the **discriminator making the incorrect choice**. This small change helps to allevaiate problems with the generator gradient vanishing when the discriminator is confident. This is the standard update used in most GAN papers, and was used in the original paper from [Goodfellow et al.](https://arxiv.org/abs/1406.2661). 
+
+Here, We will alternate the following updates:
+1. Update the generator (<a href="https://www.codecogs.com/eqnedit.php?latex=$G$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$G$" title="$G$" /></a>) to maximize the probability of the discriminator making the incorrect choice on generated data:
+
+<a href="https://www.codecogs.com/eqnedit.php?latex=$$\underset{G}{\text{maximize}}\;&space;\mathbb{E}_{z&space;\sim&space;p(z)}\left[\log&space;D(G(z))\right]$$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$$\underset{G}{\text{maximize}}\;&space;\mathbb{E}_{z&space;\sim&space;p(z)}\left[\log&space;D(G(z))\right]$$" title="$$\underset{G}{\text{maximize}}\; \mathbb{E}_{z \sim p(z)}\left[\log D(G(z))\right]$$" /></a>
+
+2. Update the discriminator (<a href="https://www.codecogs.com/eqnedit.php?latex=$D$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$D$" title="$D$" /></a>), to maximize the probability of the discriminator making the correct choice on real and generated data:
+
+<a href="https://www.codecogs.com/eqnedit.php?latex=$$\underset{D}{\text{maximize}}\;&space;\mathbb{E}_{x&space;\sim&space;p_\text{data}}\left[\log&space;D(x)\right]&space;&plus;&space;\mathbb{E}_{z&space;\sim&space;p(z)}\left[\log&space;\left(1-D(G(z))\right)\right]$$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$$\underset{D}{\text{maximize}}\;&space;\mathbb{E}_{x&space;\sim&space;p_\text{data}}\left[\log&space;D(x)\right]&space;&plus;&space;\mathbb{E}_{z&space;\sim&space;p(z)}\left[\log&space;\left(1-D(G(z))\right)\right]$$" title="$$\underset{D}{\text{maximize}}\; \mathbb{E}_{x \sim p_\text{data}}\left[\log D(x)\right] + \mathbb{E}_{z \sim p(z)}\left[\log \left(1-D(G(z))\right)\right]$$" /></a>
 
 ### LSGAN
 
+It is more stable alternative to the original GAN loss function.
+
+#### Generator Loss
+
+<a href="https://www.codecogs.com/eqnedit.php?latex=$$\ell_G&space;=&space;\frac{1}{2}\mathbb{E}_{z&space;\sim&space;p(z)}\left[\left(D(G(z))-1\right)^2\right]$$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$$\ell_G&space;=&space;\frac{1}{2}\mathbb{E}_{z&space;\sim&space;p(z)}\left[\left(D(G(z))-1\right)^2\right]$$" title="$$\ell_G = \frac{1}{2}\mathbb{E}_{z \sim p(z)}\left[\left(D(G(z))-1\right)^2\right]$$" /></a>
+
+#### Discriminator Loss
+
+<a href="https://www.codecogs.com/eqnedit.php?latex=$$&space;\ell_D&space;=&space;\frac{1}{2}\mathbb{E}_{x&space;\sim&space;p_\text{data}}\left[\left(D(x)-1\right)^2\right]&space;&plus;&space;\frac{1}{2}\mathbb{E}_{z&space;\sim&space;p(z)}\left[&space;\left(D(G(z))\right)^2\right]$$" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$$&space;\ell_D&space;=&space;\frac{1}{2}\mathbb{E}_{x&space;\sim&space;p_\text{data}}\left[\left(D(x)-1\right)^2\right]&space;&plus;&space;\frac{1}{2}\mathbb{E}_{z&space;\sim&space;p(z)}\left[&space;\left(D(G(z))\right)^2\right]$$" title="$$ \ell_D = \frac{1}{2}\mathbb{E}_{x \sim p_\text{data}}\left[\left(D(x)-1\right)^2\right] + \frac{1}{2}\mathbb{E}_{z \sim p(z)}\left[ \left(D(G(z))\right)^2\right]$$" /></a>
+
 ### WGAN
 
-## How to run?
+Algorithm from [WGAN](https://arxiv.org/abs/1704.00028) paper.
+![Algorithm 1](https://cdn-images-1.medium.com/max/1600/1*JnBQNCOJxa8w9YMc5YjoXQ.png)
 
 ## Dependencies
 
+A system with `anaconda` and `jupyter notebook` installed is required.
+
+### Python Packages required
+
+`PyTorch 0.3`
+
+`TensorFlow r1.7`
+
+`numpy 1.4.2`
+
+`matplotlib`
+
+## How to run?
+Change to any directory you want to download the project to.
+
+```shell
+git clone https://github.com/divyanshj16/GANs.git
+cd GANs
+jupyter notebook
+```
+
 ## System Requirements
 
+Since the dataset is small this can run even on CPU in reasonable time. The GPU provides big boost to the DCGAN part.
+
 ## Results
+
+### TensorFlow
+
+#### Vanilla GANs
+
+![VGAN](./images/tf/download.png)
+
+#### LSGAN loss + Vanilla Architechture
+
+![LSGAN](./images/tf/ls.png)
+
+#### DCGAN with LSGAN loss
+
+![DCGAN](./images/tf/DC.png)
+
+#### WGAN
+
+![WGAN](./images/tf/WGAN.png)
+
+### PyTorch
+
+#### Vanilla GANs
+
+![VGAN](./images/pt/van.png)
+
+#### LSGAN loss + Vanilla Architechture
+
+![LSGAN](./images/pt/ls.png)
+
+#### DCGAN with LSGAN loss
+
+![DCGAN](./images/pt/dcls.png)
